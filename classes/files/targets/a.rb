@@ -6,5 +6,9 @@ module Rue
 		def initialize(project, name, options = {})
 			super(project, name, options)
 		end
+		
+		def linkname
+			return @name
+		end
 	end
 end

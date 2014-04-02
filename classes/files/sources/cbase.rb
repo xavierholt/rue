@@ -8,26 +8,24 @@ module Rue
 		end
 		
 		def check!
-			deps = {}
-			gens = {}
-			
+			@ctime = Time.now
 			File.open(@name, 'r') do |file|
 				file.each_line do |line|
 					if(match = line.match(/\A\s*#\s*include\s+\"([^\"]+)\"/))
-						dep = File.realpath(match[1], self.dirname)
-						deps[dep] = {} if dep.start_with?(@project.srcdir + '/')
+						name = File.realpath(match[1], self.dirname)
+						if name.start_with?(@project.srcdir + '/')
+							file = @project.files.source(name)
+							@deps.add(file)
+						end
 					end
 					
 					if(line.include? 'Q_OBJECT')
-						gens[@name + '.moc.cpp'] = {:source => @name}
+						file = @project.files.source(@name + '.moc.cpp')
+						file.source = self
+						@gens.add(file)
 					end
 				end
 			end
-			
-			return {
-				:deps => deps,
-				:gens => gens
-			}
 		end
 	end
 end

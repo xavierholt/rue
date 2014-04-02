@@ -3,8 +3,9 @@ require_relative 'cbase'
 module Rue
 	class HFile < CBase
 		
-		def initialize(project, name, options)
-			super(project, name, options)
+		def object(target)
+			# I'm just a header - don't compile me!
+			return nil
 		end
 	end
 end

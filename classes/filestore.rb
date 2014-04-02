@@ -1,5 +1,7 @@
 require_relative 'files/all'
 
+require 'json'
+
 module Rue
 	class FileStore
 		
@@ -33,106 +35,99 @@ module Rue
 		
 		def initialize(project)
 			@project = project
-			@cache = {}
-			@files = {}
 			@ignore = {}
+			
+			@objects = {}
+			@sources = {}
+			@srcdirs = {}
 			@targets = {}
-		end
-		
-		def add(name, options = {})
-			if(file = @files[name])
-				@project.logger.debug("Merging  #{name}")
-				
-				file.merge(options)
-				return file
-			else
-				@project.logger.debug("Adding   #{name}")
-				
-				type = self.file_class(name)
-				@project.error("Unknown extension: #{name}") unless type
-				file = type.new(@project, name, options)
-				
-				if(name.start_with? "#{@project.objdir}/latest/cache/")
-					@targets.each_pair do |tree, target|
-						if(name.start_with? tree)
-							@project.logger.debug(" - Component of #{target.name}")
-							target.reqs(file)
-						end
-					end
+			
+			begin
+				@project.logger.debug("Loading cache.")
+				File.open('.ruecache', 'r') do |file|
+					@cache = JSON.load(file.read)
 				end
-				
-				@files[name] = file
-				return file
+			rescue
+				@project.logger.warn("Failed to load cache!")
+				@cache = {}
 			end
 		end
 		
 		def build!
-			@targets.each_value {|target| target.crawl!}
+			@targets.each_value(&:build!)
 		end
 		
-		def crawl(srcdir, objdir, dir = nil)
-			Dir.chdir(dir || srcdir) do
-				Dir.glob('*') do |file|
-					name = File.realpath(file)
-					if(Dir.exists?(file))
-						FileUtils.mkdir_p(name.sub(srcdir, "#{objdir}/latest/cache"))
-						self.crawl(srcdir, objdir, file)
-					else
-						self.add(name)
-					end
-				end
-			end
+		def file_class(name)
+			FILETYPES.each {|k, v| return v if name.end_with? k}
+			return nil
 		end
 		
-		def file_class(name, default = nil)
-			FILETYPES.each_pair do |ext, type|
-				return type if name.end_with? ext
+		def object(name)
+			unless @objects[name]
+				@objects[name] = OFile.new(@project, name)
 			end
 			
-			return default
-		end
-		
-		def load_cache(filename)
-			File.open(filename, 'r') {|file| @cache = JSON.load(file.read)}
-			#TODO:  Process into objects!
-		end
-		
-		def obj(name, options = {})
-			options[:type]   = :o
-			options[:source] = name
-			oname = name.sub("#{@project.srcdir}/", "#{@project.objdir}/latest/") << '.o'
-			self.add(oname, options)
+			return @objects[name]
 		end
 		
 		def print
-			@files.each_pair do |k, v|
+			@sources.each_pair do |k, v|
 				puts k
-				v.dependencies.each do |dep|
-					puts " - #{dep}"
-				end
+				v.deps.each {|dep| puts " - #{dep}"}
 				puts ''
 			end
 		end
 		
-		def save_cache(filename)
-			files = @files.select {|f| !f.auto?}
-			File.open(filename, 'w') {|file| file << files.to_json}
-		end
-		
-		def target(name, options)
-			cachedir = "#{@project.objdir}/latest/cache/#{options[:dir]}/"
-			@project.logger.debug("Target   #{cachedir}")
-			@targets[cachedir] = self.add("#{@project.objdir}/latest/#{name}", options)
-		end
-		
-		def [] (key)
-			if file = @files[key]
-				return file
-			elsif opts = @cache[key]
-				return self.add(key, opts)
-			else
-				return nil
+		def save_cache
+			@project.logger.debug("Saving cache.")
+			File.open('.ruecache', 'w') do |file|
+				file << JSON.fast_generate(@sources, :indent => '  ', :object_nl => "\n")
 			end
+		end
+		
+		def source(name)
+			unless @sources[name]
+				unless type = self.file_class(name)
+					@project.logger.warn("Skipping #{name} - unknown extension.")
+					return
+				end
+				
+				@project.logger.debug("Adding   #{name}")
+				file = type.new(@project, name, @cache[name] || {})
+				@sources[name] = file
+			end
+			
+			return @sources[name]
+		end
+		
+		def sources(dir)
+			dir = File.realpath(dir)
+			unless @srcdirs[dir]
+				@srcdirs[dir] = []
+				Find.find(dir) do |path|
+					unless Dir.exists? path
+						name = File.realpath(path)
+						file = self.source(name)
+						@srcdirs[dir] << file if file
+					end
+				end
+			end
+			
+			return @srcdirs[dir] || []
+		end
+		
+		def target(name, options = {})
+			unless @targets[name]
+				unless type = self.file_class(options[:type] || name)
+					@project.error("Could not determine type of target \"#{name}\"!")
+				end
+				
+				fullname = "#{@project.objdir}/latest/#{name}"
+				@project.logger.debug("Target   #{fullname}")
+				@targets[name] = type.new(@project, fullname, options)
+			end
+			
+			return @targets[name]
 		end
 	end
 end

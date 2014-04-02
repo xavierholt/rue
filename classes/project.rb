@@ -8,13 +8,29 @@ module Rue
 	class Project
 		
 		attr_accessor :default_mode
+		attr_reader   :files
 		attr_accessor :logger
 		attr_reader   :objdir
 		attr_reader   :srcdir
 		
+		COLORIZE = {
+			'DEBUG' => 37,
+			'INFO'  => 34,
+			'WARN'  => 33,
+			'ERROR' => 31,
+			'FATAL' => 31
+		}
+		
 		def initialize
-			@files  = FileStore.new(self)
 			@logger = Logger.new(STDOUT)
+			@logger.level = Logger::INFO
+			@logger.formatter = proc do |severity, datetime, progname, msg|
+				prompt = sprintf('%-5s (Rue): ', severity)
+				prompt = "\033[1m\033[#{COLORIZE[severity]}m#{prompt}\033[0m"
+				"#{prompt}#{msg}\n"
+			end
+			
+			@files  = FileStore.new(self)
 			@modes  = {}
 			
 			self.objdir = 'builds'
@@ -49,7 +65,8 @@ module Rue
 				:out => {
 					:command => '%{program} %{flags} %{source} -o %{target} %{libs}',
 					:program => 'g++',
-					:flags => ''
+					:flags => '',
+					:libs => ''
 				},
 				:s => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
@@ -72,31 +89,42 @@ module Rue
 				FileUtils.rm_rf(self.objdir)
 				self[:build] = false
 			end
+			
+			self.mode('print') do
+				@files.crawl(@srcdir, @objdir)
+				@files.print
+				self[:build] = false
+			end
 		end
 		
 		def build!(*modes)
 			error('Error:  No source directory.') if @srcdir.nil?
 			error('Error:  No builds directory.') if @objdir.nil?
 			
+			built = false
+			
 			modes << @default_mode if modes.empty?
 			modes.each do |modename|
-				@logger.info("Building mode #{modename}")
 				mode = @modes[modename]
 				
 				if(mode.nil?)
 					@logger.warn("No mode \"#{modename}\" is defined - skipping.")
 					next
 				end
+				
+				@logger.info("Building mode #{modename}")
 			
 				self.scoped do
 					mode.prepare!
-					
-					unless(self[:build] == false)
-						@files.crawl(@srcdir, @objdir)
+					unless self[:build] == false
 						@files.build!
+						built = true
 					end
 				end
 			end
+			
+		ensure
+			@files.save_cache if built
 		end
 		
 		def builder(src, dst)
@@ -104,8 +132,9 @@ module Rue
 		end
 		
 		def execute(command)
-			@logger.debug(command)
-			unless(system(command))
+			if(system(command))
+				@logger.debug(command)
+			else
 				error('Command failed:', command)
 			end
 		end
@@ -130,10 +159,6 @@ module Rue
 			@objdir = File.realpath(dir)
 		end
 		
-		def oname(name)
-			return name.sub(@srcdir, "#{@objdir}/latest/cache") << '.o'
-		end
-		
 		def scoped
 			@options.push(@options.last.dup)
 			yield
@@ -145,9 +170,10 @@ module Rue
 		end
 		
 		def target(name, options = {}, &block)
-			options[:dir] ||= name.sub(/\.[^.]+\Z/, '')
-			options[:reqs]  = Array(options[:reqs]).map {|r| "#{@objdir}/latest/#{r}"}
-			options[:block] = block
+			options[:srcdir] ||= "#{@srcdir}/#{name.sub(/\.[^.]+\Z/, '')}"
+			options[:objdir] ||= "#{@objdir}/latest/cache/#{name}"
+			options[:block]    = block
+			options[:libs]     = Array(options[:libs]).map {|n| @files.target(n)}
 			@files.target(name, options)
 		end
 		
