@@ -59,6 +59,22 @@ module Rue
 			return File.exists?(@name)
 		end
 		
+		def print
+			puts "   #{@name} (#{self.class})"
+			if @source
+				puts "      Source:"
+				puts "       - #{@source.name}"
+			end
+			if @deps and not @deps.empty?
+				puts "      Dependencies:"
+				@deps.each {|dep| puts "       - #{dep.name}"}
+			end
+			if @gens and not @gens.empty?
+				puts "      Generates:"
+				@gens.each {|gen| puts "       - #{gen.name}"}
+			end
+		end
+		
 		def source=(s)
 			unless @source.nil? or @source == s
 				@project.error("Attempted to re-source #{@name}!\n  Old Source: #{@source}\n  New Source: #{s}")

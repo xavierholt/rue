@@ -37,6 +37,7 @@ module Rue
 			self.srcdir = 'src'
 			
 			@options = [{
+				:build => true,
 				:a => {
 					:command => '%{program} %{flags} %{target} %{source}',
 					:program => 'ar',
@@ -87,21 +88,19 @@ module Rue
 			self.mode('clean') do
 				@logger.info("Removing #{self.objdir}")
 				FileUtils.rm_rf(self.objdir)
-				self[:build] = false
+				self[:crawl] = false
 			end
 			
 			self.mode('print') do
-				@files.crawl(@srcdir, @objdir)
-				@files.print
 				self[:build] = false
+				@files.crawl!
+				@files.print
 			end
 		end
 		
 		def build!(*modes)
 			error('Error:  No source directory.') if @srcdir.nil?
 			error('Error:  No builds directory.') if @objdir.nil?
-			
-			built = false
 			
 			modes << @default_mode if modes.empty?
 			modes.each do |modename|
@@ -116,15 +115,12 @@ module Rue
 			
 				self.scoped do
 					mode.prepare!
-					unless self[:build] == false
-						@files.build!
-						built = true
-					end
+					@files.build! if self[:build]
 				end
 			end
 			
 		ensure
-			@files.save_cache if built
+			@files.save_cache if @files.crawled?
 		end
 		
 		def builder(src, dst)

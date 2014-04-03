@@ -54,7 +54,17 @@ module Rue
 		end
 		
 		def build!
+			self.crawl! unless self.crawled?
 			@targets.each_value(&:build!)
+		end
+		
+		def crawl!
+			@targets.each_value(&:crawl!)
+			@crawled = true
+		end
+		
+		def crawled?
+			return @crawled
 		end
 		
 		def file_class(name)
@@ -71,11 +81,12 @@ module Rue
 		end
 		
 		def print
-			@sources.each_pair do |k, v|
-				puts k
-				v.deps.each {|dep| puts " - #{dep}"}
-				puts ''
-			end
+			puts 'TARGETS:'
+			@targets.each_value {|t| t.print}
+			puts 'OBJECTS:'
+			@objects.each_value {|o| o.print}
+			puts 'SOURCES:'
+			@sources.each_value {|s| s.print}
 		end
 		
 		def save_cache

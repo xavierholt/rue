@@ -31,6 +31,14 @@ module Rue
 		end
 		
 		def build!
+			@project.scoped do
+				@project.logger.debug("Preparing #{@name}")
+				@block.call if @block
+				super
+			end
+		end
+		
+		def crawl!
 			Find.find(@srcdir) do |path|
 				if Dir.exists? path
 					FileUtils.mkdir_p(path.sub(@srcdir, @objdir))
@@ -40,12 +48,6 @@ module Rue
 			@project.files.sources(self.srcdir).each do |s|
 				o = s.object(self)
 				@deps.add(o) if o
-			end
-			
-			@project.scoped do
-				@project.logger.debug("Preparing #{@name}")
-				@block.call if @block
-				super
 			end
 		end
 	end
