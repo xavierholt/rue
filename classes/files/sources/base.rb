@@ -6,18 +6,19 @@ module Rue
 		def initialize(project, name, options = {})
 			super(project, name, options)
 			
-			@ctime   = Time.at(options['time']) rescue nil
+			@ctime = Time.at(options['time']) rescue nil
+			
 			if self.check?
 				@gens = Set.new
 				@project.logger.debug("Scanning #{@name}")
 				self.check!
 			else
 				@project.logger.debug("Cached   #{@name}")
-				@deps.merge(options['deps'].map do |d|
+				@deps.merge(Array(options['deps']).map do |d|
 					@project.files.source(d)
 				end)
 				
-				@gens = Set.new(options['gens'].map do |g|
+				@gens = Set.new(Array(options['gens']).map do |g|
 					gen = @project.files.source(g)
 					gen.source = self
 					gen

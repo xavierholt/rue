@@ -24,27 +24,25 @@ module Rue
 			}
 		end
 		
-		def build?
-			b = super
-			@project.logger.info("#{@name} is up to date.") unless b
-			return b
-		end
-		
 		def build!
-			@project.scoped do
-				@project.logger.debug("Preparing #{@name}")
-				@block.call if @block
-				super
+			if self.build?
+				Find.find(@srcdir) do |path|
+					if Dir.exists? path
+						FileUtils.mkdir_p(path.sub(@srcdir, @objdir))
+					end
+				end
+				
+				@project.scoped do
+					@project.logger.debug("Preparing #{@name}")
+					@block.call if @block
+					super
+				end
+			else
+				@project.logger.info("#{@name} is up to date.")
 			end
 		end
 		
 		def crawl!
-			Find.find(@srcdir) do |path|
-				if Dir.exists? path
-					FileUtils.mkdir_p(path.sub(@srcdir, @objdir))
-				end
-			end
-			
 			@project.files.sources(self.srcdir).each do |s|
 				o = s.object(self)
 				@deps.add(o) if o

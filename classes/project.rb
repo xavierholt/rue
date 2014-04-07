@@ -88,7 +88,7 @@ module Rue
 			self.mode('clean') do
 				@logger.info("Removing #{self.objdir}")
 				FileUtils.rm_rf(self.objdir)
-				self[:crawl] = false
+				self[:build] = false
 			end
 			
 			self.mode('print') do

@@ -55,7 +55,10 @@ module Rue
 		
 		def build!
 			self.crawl! unless self.crawled?
-			@targets.each_value(&:build!)
+			@targets.each_value do |target|
+				target.graph!
+				target.build!
+			end
 		end
 		
 		def crawl!
@@ -74,7 +77,8 @@ module Rue
 		
 		def object(name)
 			unless @objects[name]
-				@objects[name] = OFile.new(@project, name)
+				@project.logger.debug("Object   #{name}")
+				OFile.new(@project, name)
 			end
 			
 			return @objects[name]
@@ -89,10 +93,23 @@ module Rue
 			@sources.each_value {|s| s.print}
 		end
 		
+		def register(file)
+			case file
+			when SourceFile
+				@sources[file.name] = file
+			when ObjectFile
+				@objects[file.name] = file
+			when TargetFile
+				# Silently skip...
+			else
+				@project.error("Unrecognized file object: \"#{file}\"")
+			end
+		end
+		
 		def save_cache
 			@project.logger.debug("Saving cache.")
 			File.open('.ruecache', 'w') do |file|
-				file << JSON.fast_generate(@sources, :indent => '  ', :object_nl => "\n")
+				file << JSON.fast_generate(@sources, :indent => '  ', :object_nl => "\n", :array_nl => "\n")
 			end
 		end
 		
@@ -103,9 +120,8 @@ module Rue
 					return
 				end
 				
-				@project.logger.debug("Adding   #{name}")
-				file = type.new(@project, name, @cache[name] || {})
-				@sources[name] = file
+				@project.logger.debug("Source   #{name}")
+				type.new(@project, name, @cache[name] || {})
 			end
 			
 			return @sources[name]
