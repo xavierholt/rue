@@ -27,7 +27,7 @@ module Rue
 		end
 		
 		def check?
-			return (@ctime.nil? || @mtime > @ctime)
+			return (@ctime.nil? || (@mtime && (@mtime > @ctime)))
 		end
 		
 		def object(target)

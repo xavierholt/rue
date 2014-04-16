@@ -18,28 +18,28 @@ module Rue
 		
 		def args
 			return {
-				:libs => "#{@project[:libs]} -L'#{@project.objdir}/latest' #{@libs.map(&:linkname).join(' ')}",
+				:mylibs => "-L'#{@project.objdir}/latest' #{@libs.map(&:linkname).join(' ')}",
 				:source => @deps.to_a.join(' '),
 				:target => @name
 			}
 		end
 		
 		def build!
-			if self.build?
-				Find.find(@srcdir) do |path|
-					if Dir.exists? path
-						FileUtils.mkdir_p(path.sub(@srcdir, @objdir))
-					end
-				end
-				
-				@project.scoped do
-					@project.logger.debug("Preparing #{@name}")
-					@block.call if @block
-					super
-				end
-			else
-				@project.logger.info("#{@name} is up to date.")
+			#@project.logger.info("#{@name} is up to date.")
+			@project.scoped do
+				@project.logger.debug("Preparing #{@name}")
+				@block.call if @block
+				super
 			end
+		end
+		
+		def build_deps!
+			Find.find(@srcdir) do |path|
+				if Dir.exists? path
+					FileUtils.mkdir_p(path.sub(@srcdir, @objdir))
+				end
+			end
+			super
 		end
 		
 		def crawl!

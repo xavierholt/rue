@@ -8,6 +8,7 @@ module Rue
 		end
 		
 		def check!
+			return unless self.exists?
 			@ctime = Time.now
 			File.open(@name, 'r') do |file|
 				file.each_line do |line|

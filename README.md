@@ -1,9 +1,8 @@
-rue
-===
+# Rue
 A quiet but helpful build system.
 
 
-# Getting Started
+## Getting Started
 
 You'll need to have Ruby installed, this repository downloaded, and - for best
 results - a symlink to the file "rue.rb" somewhere on your path.  If you've done
@@ -16,7 +15,7 @@ project's configuration, and be on its way.
 If your project directory looked like this:
 
     + myproject/
-      + src
+      + src/
         - hello.cpp
         - hello.h
         - main.cpp
@@ -32,17 +31,17 @@ end
 
 Then, after running Rue, your directory would look like this:
 
-    + myproject
-      + builds
-        + all
-          + default
-            + cache
-              + hello.out
+    + myproject/
+      + builds/
+        + all/
+          + default/
+            + cache/
+              + hello.out/
                 - hello.cpp.o
                 - main.cpp.o
             - p.out
         - latest -> all/default
-      + src
+      + src/
         - hello.cpp
         - hello.h
         - main.cpp
@@ -56,7 +55,7 @@ in and deleting it (which is exactly what happens when you run `rue clean`).
 That's it!
 
 
-# What just hapened?
+## What just hapened?
 
 You told Rue that your project was made up of one Target (executable / library)
 that was called "p.out" and that had the root of its source tree at "src".  Rue
@@ -71,7 +70,7 @@ expensive.  So it keeps a dependency cache as well.  If your compilation was
 successful, the cache file was saved, and Rue won't have to parse a bunch of
 files next time you run it.
 
-# Details
+## Details
 
 Rue has two main forms of configuration: Targets and Modes.  A Target, as we've
 already seen, is something the compiler is expected to produce.  A Mode is a

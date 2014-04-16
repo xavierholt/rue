@@ -8,7 +8,7 @@ module Rue
 		end
 		
 		def prepare!
-			@prepare.call
+			@prepare.call if @prepare
 			
 			if(@project[:build] != false)
 				@project.logger.debug("Creating #{@project.objdir}/all/#{@name}")

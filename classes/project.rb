@@ -30,12 +30,11 @@ module Rue
 				"#{prompt}#{msg}\n"
 			end
 			
-			@files  = FileStore.new(self)
-			@modes  = {}
-			
-			self.objdir = 'builds'
 			self.srcdir = 'src'
+			self.objdir = 'builds'
 			
+			@files   = FileStore.new(self)
+			@modes   = {}
 			@options = [{
 				:build => true,
 				:a => {
@@ -64,7 +63,7 @@ module Rue
 					:flags => '-Ur'
 				},
 				:out => {
-					:command => '%{program} %{flags} %{source} -o %{target} %{libs}',
+					:command => '%{program} %{flags} %{source} -o %{target} %{mylibs} %{libs}',
 					:program => 'g++',
 					:flags => '',
 					:libs => ''
@@ -99,9 +98,6 @@ module Rue
 		end
 		
 		def build!(*modes)
-			error('Error:  No source directory.') if @srcdir.nil?
-			error('Error:  No builds directory.') if @objdir.nil?
-			
 			modes << @default_mode if modes.empty?
 			modes.each do |modename|
 				mode = @modes[modename]
@@ -111,8 +107,6 @@ module Rue
 					next
 				end
 				
-				@logger.info("Building mode #{modename}")
-			
 				self.scoped do
 					mode.prepare!
 					@files.build! if self[:build]
@@ -139,10 +133,6 @@ module Rue
 			@logger.fatal(str)
 			@logger.fatal(detail) if detail
 			exit(1)
-		end
-		
-		def file(name, options = {})
-			@files.add(name, options)
 		end
 		
 		def mode(name, &block)

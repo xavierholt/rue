@@ -109,7 +109,11 @@ module Rue
 		def save_cache
 			@project.logger.debug("Saving cache.")
 			File.open('.ruecache', 'w') do |file|
-				file << JSON.fast_generate(@sources, :indent => '  ', :object_nl => "\n", :array_nl => "\n")
+				file << JSON.fast_generate(@sources, {
+					:indent    => '  ',
+					:object_nl => "\n",
+					:array_nl  => "\n"
+				})
 			end
 		end
 		
@@ -146,6 +150,7 @@ module Rue
 		def target(name, options = {})
 			unless @targets[name]
 				unless type = self.file_class(options[:type] || name)
+					# TODO:  Assume it's an executable?  Or should the user have to specify?
 					@project.error("Could not determine type of target \"#{name}\"!")
 				end
 				
