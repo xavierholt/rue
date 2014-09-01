@@ -1,11 +1,7 @@
-require_relative 'base'
+require_relative '../target'
 
 module Rue
-	class ExeFile < FileBase
-		
-		def initialize(project, filename, deps)
-			deps ||= @project.libs.map {|l| l.filename}
-			super(project, filename, :exe, deps)
-		end
+	class ExeFile < TargetFile
+		###
 	end
 end

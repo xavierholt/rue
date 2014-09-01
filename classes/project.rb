@@ -1,17 +1,19 @@
 require_relative 'mode'
 require_relative 'filestore'
+require_relative 'filestore2'
+require_relative 'task'
 
 require 'fileutils'
 require 'logger'
 
 module Rue
 	class Project
-		
 		attr_accessor :default_mode
 		attr_reader   :files
 		attr_accessor :logger
 		attr_reader   :objdir
 		attr_reader   :srcdir
+		attr_reader   :tasks
 		
 		COLORIZE = {
 			'DEBUG' => 37,
@@ -33,14 +35,20 @@ module Rue
 			self.srcdir = 'src'
 			self.objdir = 'builds'
 			
-			@files   = FileStore.new(self)
+			@default_mode = 'default'
+			@files   = FileStore2.new(self)
 			@modes   = {}
+			@tasks   = {}
 			@options = [{
-				:build => true,
 				:a => {
 					:command => '%{program} %{flags} %{target} %{source}',
 					:program => 'ar',
 					:flags => 'rcs'
+				},
+				:as => {
+					:command => '%{program} %{flags} %{source} -o %{target}',
+					:program => 'as',
+					:flags => ''
 				},
 				:c => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
@@ -54,7 +62,7 @@ module Rue
 				},
 				:moc => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
-					:program => 'moc-qt4',
+					:program => 'moc',
 					:flags => ''
 				},
 				:o => {
@@ -68,11 +76,6 @@ module Rue
 					:flags => '',
 					:libs => ''
 				},
-				:s => {
-					:command => '%{program} %{flags} %{source} -o %{target}',
-					:program => 'as',
-					:flags => ''
-				},
 				:so => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
 					:program => 'g++',
@@ -80,41 +83,77 @@ module Rue
 				}
 			}]
 			
-			self.mode('default') do
-				# Nothing special.
+			self.mode('default')
+			
+			self.task('build', ['graph']) do
+				built = @files.targets.inject(false) do |f, tgt|
+					f |= tgt.cycle.build!
+				end
+				
+				unless built
+					self.logger.info('All targets up to date.')
+				end
 			end
 			
-			self.mode('clean') do
+			self.task('clean') do
 				@logger.info("Removing #{self.objdir}")
 				FileUtils.rm_rf(self.objdir)
-				self[:build] = false
 			end
 			
-			self.mode('print') do
-				self[:build] = false
-				@files.crawl!
-				@files.print
-			end
-		end
-		
-		def build!(*modes)
-			modes << @default_mode if modes.empty?
-			modes.each do |modename|
-				mode = @modes[modename]
-				
-				if(mode.nil?)
-					@logger.warn("No mode \"#{modename}\" is defined - skipping.")
-					next
+			self.task('crawl', ['mode']) do
+				@files.targets.each do |tgt|
+					@files.walk(tgt.srcdir)
 				end
 				
-				self.scoped do
+				@files.each do |file|
+					file.check!
+				end
+				
+				@files.targets.each do |tgt|
+					@files[tgt.srcdir].walk do |file|
+						obj = file.object(tgt)
+						tgt.deps.add(obj) if obj
+					end
+				end
+				
+				@files.save_cache
+			end
+			
+			self.task('graph', ['crawl']) do
+				cycles = @files.map do |file|
+					file.graph!
+					file.cycle
+				end
+				
+				cycles.each do |cycle|
+					cycle.check!
+				end
+			end
+			
+			self.task('mode') do
+				modename = @current_mode || @default_mode
+				if mode = @modes[modename]
 					mode.prepare!
-					@files.build! if self[:build]
+				else
+					self.error("No mode \"#{modename}\" defined.")
 				end
 			end
 			
-		ensure
-			@files.save_cache if @files.crawled?
+			self.task('print', ['crawl']) do
+				@files.each do |file|
+					file.print
+				end
+			end
+			
+			self.task('tree', ['crawl']) do
+				@files.each do |file|
+					file.walk do |f, level|
+						n = f.name
+						n = ::File.basename(f.to_s) unless file ==f
+						puts '   ' * level + n
+					end if file.dir.nil?
+				end
+			end
 		end
 		
 		def builder(src, dst)
@@ -136,13 +175,30 @@ module Rue
 		end
 		
 		def mode(name, &block)
-			@default_mode ||= name
 			@modes[name] = Mode.new(self, name, block)
+			self.task(name) do
+				self.mode = name
+				self.run!('build')
+			end
+		end
+		
+		def mode=(modename)
+			@current_mode = modename
 		end
 		
 		def objdir=(dir)
 			FileUtils.mkdir_p(dir)
-			@objdir = File.realpath(dir)
+			@objdir = ::File.realpath(dir)
+		end
+		
+		def run!(*tasknames)
+			tasknames.each do |taskname|
+				if task = @tasks[taskname]
+					self.scoped {task.run!}
+				else
+					self.error("No task \"#{taskname}\" defined.")
+				end
+			end
 		end
 		
 		def scoped
@@ -152,15 +208,19 @@ module Rue
 		end
 		
 		def srcdir=(dir)
-			@srcdir = File.realpath(dir)
+			@srcdir = ::File.realpath(dir)
 		end
 		
 		def target(name, options = {}, &block)
 			options[:srcdir] ||= "#{@srcdir}/#{name.sub(/\.[^.]+\Z/, '')}"
-			options[:objdir] ||= "#{@objdir}/latest/cache/#{name}"
+			options[:objdir]   = "#{@objdir}/latest/cache/#{name}"
 			options[:block]    = block
 			options[:libs]     = Array(options[:libs]).map {|n| @files.target(n)}
 			@files.target(name, options)
+		end
+		
+		def task(name, subs = [], &block)
+			@tasks[name] = Task.new(self, name, subs, block)
 		end
 		
 		def [] (key)

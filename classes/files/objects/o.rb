@@ -1,12 +1,7 @@
-require_relative 'base'
+require_relative '../object'
 
 module Rue
 	class OFile < ObjectFile
-		
-		def initialize(project, name, options = {})
-			super(project, name, options)
-		end
-		
 		def linkname
 			return @name
 		end

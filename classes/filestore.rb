@@ -1,9 +1,9 @@
-require_relative 'files/all'
-
+require 'find'
 require 'json'
 
 module Rue
-	class FileStore
+	class FileStore2
+		include Enumerable
 		
 		FILETYPES = {
 			'.moc.cpp' => MocFile,
@@ -25,6 +25,7 @@ module Rue
 			[CppFile,  OFile]   => :cpp,
 			[CppFile,  MocFile] => :moc,
 			[HFile,    MocFile] => :moc,
+			[MocFile,  OFile]   => :cpp,
 			[SFile,    OFile]   => :as,
 			
 			[NilClass, AFile]   => :a,
@@ -33,18 +34,19 @@ module Rue
 			[NilClass, SOFile]  => :so
 		}
 		
+		attr_reader :targets
+		
 		def initialize(project)
 			@project = project
-			@ignore = {}
+			@targets = []
 			
-			@objects = {}
-			@sources = {}
-			@srcdirs = {}
-			@targets = {}
+			@all  = []
+			@map  = {}
+			@stat = {}
 			
 			begin
 				@project.logger.debug("Loading cache.")
-				File.open('.ruecache', 'r') do |file|
+				::File.open('.ruecache', 'r') do |file|
 					@cache = JSON.load(file.read)
 				end
 			rescue
@@ -53,113 +55,92 @@ module Rue
 			end
 		end
 		
-		def build!
-			self.crawl! unless self.crawled?
-			@targets.each_value do |target|
-				target.graph!
-				target.build!
+		def add(path, type = nil)
+			if file = @map[path]
+				return file
+			elsif type ||= fileclass(path)
+				file = type.new(@project, path)
+				return @map[path] = file
+			else
+				@project.logger.warn("Skipping file of unknown type: #{path}")
+				return nil
 			end
 		end
 		
-		def crawl!
-			@targets.each_value(&:crawl!)
-			@crawled = true
+		def cache(path)
+			return @cache[path]
 		end
 		
-		def crawled?
-			return @crawled
+		def each
+			@all.each {|file| yield file}
 		end
 		
-		def file_class(name)
-			FILETYPES.each {|k, v| return v if name.end_with? k}
-			return nil
-		end
-		
-		def object(name)
-			unless @objects[name]
-				@project.logger.debug("Object   #{name}")
-				OFile.new(@project, name)
+		def fileclass(name, default = nil)
+			FILETYPES.each_pair do |k, v|
+				return v if name.end_with?(k)
 			end
 			
-			return @objects[name]
+			return default
 		end
 		
-		def print
-			puts 'TARGETS:'
-			@targets.each_value {|t| t.print}
-			puts 'OBJECTS:'
-			@objects.each_value {|o| o.print}
-			puts 'SOURCES:'
-			@sources.each_value {|s| s.print}
+		def include?(path)
+			return @map.include?(path)
 		end
 		
-		def register(file)
-			case file
-			when SourceFile
-				@sources[file.name] = file
-			when ObjectFile
-				@objects[file.name] = file
-			when TargetFile
-				# Silently skip...
+		def stat(path)
+			stat = @stat[path]
+			if stat
+				return stat
+			elsif stat.nil?
+				stat = ::File.stat(path) rescue false
+				return @stat[path] = stat
 			else
-				@project.error("Unrecognized file object: \"#{file}\"")
+				return nil
 			end
 		end
 		
 		def save_cache
 			@project.logger.debug("Saving cache.")
-			File.open('.ruecache', 'w') do |file|
-				file << JSON.fast_generate(@sources, {
-					:indent    => '  ',
-					:object_nl => "\n",
-					:array_nl  => "\n"
-				})
+			sources = @map.select {|n, f| SourceFile === f}
+			::File.open('.ruecache', 'w') do |file|
+				file << JSON.fast_generate(sources)
 			end
 		end
 		
-		def source(name)
-			unless @sources[name]
-				unless type = self.file_class(name)
-					@project.logger.warn("Skipping #{name} - unknown extension.")
-					return
-				end
-				
-				@project.logger.debug("Source   #{name}")
-				type.new(@project, name, @cache[name] || {})
-			end
-			
-			return @sources[name]
+		def target(name, options)
+			path = "#{@project.objdir}/latest/#{name}"
+			type = fileclass(name, OutFile)
+			file = type.new(@project, path, options)
+			@map[path] = file
+			@all << file
+			@targets << file
+			return file
 		end
 		
-		def sources(dir)
-			dir = File.realpath(dir)
-			unless @srcdirs[dir]
-				@srcdirs[dir] = []
-				Find.find(dir) do |path|
-					unless Dir.exists? path
-						name = File.realpath(path)
-						file = self.source(name)
-						@srcdirs[dir] << file if file
-					end
+		def walk(root)
+			self[root, Directory]
+			Dir.glob(root + '/*') do |path|
+				stat = self.stat(path)
+				if stat.directory?
+					self.walk(path)
+				elsif stat.file?
+					self[path]
 				end
 			end
-			
-			return @srcdirs[dir] || []
 		end
 		
-		def target(name, options = {})
-			unless @targets[name]
-				unless type = self.file_class(options[:type] || name)
-					# TODO:  Assume it's an executable?  Or should the user have to specify?
-					@project.error("Could not determine type of target \"#{name}\"!")
-				end
-				
-				fullname = "#{@project.objdir}/latest/#{name}"
-				@project.logger.debug("Target   #{fullname}")
-				@targets[name] = type.new(@project, fullname, options)
+		def [] (path, type = nil)
+			if file = @map[path]
+				return file
+			elsif type ||= fileclass(path)
+				file = type.new(@project, path)
+				@map[path] = file
+				@all << file
+				return file
+			else
+				@project.logger.warn("Skipping file of unknown type: #{path}")
+				return nil
 			end
-			
-			return @targets[name]
 		end
 	end
 end

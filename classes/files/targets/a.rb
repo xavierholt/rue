@@ -1,4 +1,4 @@
-require_relative 'base'
+require_relative '../target'
 
 module Rue
 	class AFile < TargetFile

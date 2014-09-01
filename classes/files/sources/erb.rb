@@ -1,4 +1,4 @@
-require_relative '../base'
+require_relative '../source'
 
 module Rue
 	class ErbFile < FileBase

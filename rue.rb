@@ -7,7 +7,8 @@ module Rue
 		project = Project.new
 		yield(project)
 		
-		project.build!(*ARGV)
+		args = (ARGV.empty?)? ['build'] : ARGV
+		project.run!(*args)
 	end
 end
 

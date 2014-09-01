@@ -1,10 +1,7 @@
-require_relative 'base'
+require_relative '../target'
 
 module Rue
 	class OutFile < TargetFile
-		
-		def initialize(project, name, options)
-			super(project, name, options)
-		end
+		###
 	end
 end

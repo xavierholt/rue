@@ -8,15 +8,14 @@ module Rue
 		end
 		
 		def prepare!
-			@prepare.call if @prepare
+			@project.logger.debug("Preparing mode \"#{@name}\"...")
+			@project.logger.debug("Creating #{@project.objdir}/all/#{@name}")
+			FileUtils.mkdir_p("#{@project.objdir}/all/#{@name}/cache")
+			@project.logger.debug("Linking  #{@project.objdir}/latest")
+			FileUtils.rm("#{@project.objdir}/latest", :force => true)
+			FileUtils.ln_s("all/#{@name}", "#{@project.objdir}/latest", :force => true)
 			
-			if(@project[:build] != false)
-				@project.logger.debug("Creating #{@project.objdir}/all/#{@name}")
-				FileUtils.mkdir_p("#{@project.objdir}/all/#{@name}/cache")
-				@project.logger.debug("Linking  #{@project.objdir}/latest")
-				FileUtils.rm("#{@project.objdir}/latest", :force => true)
-				FileUtils.ln_s("all/#{@name}", "#{@project.objdir}/latest", :force => true)
-			end
+			@prepare.call if @prepare
 		end
 	end
 end

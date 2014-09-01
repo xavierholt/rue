@@ -2,85 +2,46 @@ require 'set'
 require 'time'
 
 require_relative 'cycle'
+require_relative '../depset'
 
 module Rue
-	class FileBase
+	class FSBase
 		
+		attr_reader   :deps
+		attr_reader   :dir
+		attr_reader   :gens
 		attr_reader   :name
 		attr_accessor :cycle
 		
 		def initialize(project, name, options = {})
+			project.logger.debug('Adding   ' + name)
 			@project = project
 			@name    = name
-			@mtime   = File.mtime(@name) rescue nil
-			@deps    = Set.new
 			
-			@project.files.register(self)
+			@deps = DepSet.new
+			@gens = DepSet.new
 		end
 		
-		def args
-			return {
-				:source => @source,
-				:target => @name
-			}
+		def build!(force)
+			return false
 		end
 		
-		def build?
-			if(!self.exists?)
-				return true
-			elsif(@dtime && (@mtime < @dtime))
-				return true
-			else
-				return false
-			end
+		def build_required?
+			return self.mtime.nil?
 		end
 		
-		def build!
-			@cycle.build!
-			return [@mtime, @dtime].compact.max
+		def check!
+			return nil
 		end
 		
-		def build_deps!
-			@dtime = self.depmap do |d|
-				d.build! unless @cycle.include? d
-			end.compact.max
-			return self.build?
-		end
-		
-		def build_self!
-			builder = @project.builder(@source.class, self.class)
-			default = @project[builder]
-		
-			if(default)
-				@project.logger.info("Building #{@name}")
-				@project.execute(default[:command] % default.merge(self.args))
-				@mtime = Time.now
-			elsif(!self.exists?)
-				@project.error("No rule to build missing file \"#{@name}\".")
-			end
-		end
-		
-		def depmap(&block)
-			ret = @deps.map(&block)
-			ret << block.call(@source) if @source
-			ret
-		end
-		
-		def dirname
-			return File.dirname(@name)
-		end
-		
-		def each_dep
-			yield @source if @source
-			@deps.each {|d| yield d}
+		def dir=(file)
+			@deps.add(file)
+			@dir = file
+			@dir << self
 		end
 		
 		def exists?
-			return File.exists?(@name)
-		end
-		
-		def graphed?
-			return @tarjan_i
+			return !self.mtime.nil?
 		end
 		
 		def graph!(stack = [])
@@ -88,55 +49,49 @@ module Rue
 			@tarjan_i = stack.count
 			stack.push(self)
 			
-			ra = self.depmap {|d| d.graph! stack}
+			ra = self.deps.map {|d| d.graph! stack}
 			@tarjan_l = (ra << @tarjan_i).min
 			
-			if @tarjan_i == @tarjan_l
-				cycle = Cycle.new
-				loop do
-					file = stack.pop
-					cycle.add(file)
-					file.cycle = cycle
-					break if file == self
-				end
-			end
-			
+			Cycle.new(stack, self) if @tarjan_i == @tarjan_l
 			return @tarjan_l
 		end
 		
+		def mtime
+			if @mtime
+				return @mtime
+			elsif @mtime.nil?
+				stat = @project.files.stat(@name)
+				@mtime = (stat)? stat.mtime : false
+				return @mtime || nil
+			else
+				return nil
+			end
+		end
+		
+		def object(target)
+			return nil
+		end
+		
 		def print
-			puts "   #{@name} (#{self.class})"
-			if @source
-				puts "      Source:"
-				puts "       - #{@source.name}"
-			end
-			if @deps and not @deps.empty?
-				puts "      Dependencies:"
-				@deps.each {|dep| puts "       - #{dep.name}"}
-			end
-			if @gens and not @gens.empty?
-				puts "      Generates:"
-				@gens.each {|gen| puts "       - #{gen.name}"}
-			end
-		end
-		
-		def source=(s)
-			unless @source.nil? or @source == s
-				@project.error("Attempted to re-source #{@name}!\n  Old Source: #{@source}\n  New Source: #{s}")
-			end
+			puts "#{@name} (#{self.class})"
+			@deps.each do |dep|
+				desc = "\e[35m-\e[39m"
+				desc = "\e[34m~\e[39m" if dep == @dir
+				desc = "\e[36m*\e[39m" if dep == @deps.main
+				puts "   #{desc} #{dep.name}"
+			end if @deps
 			
-			@source = s
-		end
-		
-		def to_json(*args)
-			ret = {:time => @ctime.to_i}
-			ret[:deps] = @deps.map(&:name) unless @deps.empty?
-			ret[:gens] = @gens.map(&:name) unless @gens.empty?
-			return ret.to_json(*args)
+			@gens.each do |gen|
+				puts "   \e[32m+\e[39m #{gen.name}"
+			end if @gens
 		end
 		
 		def to_s
 			return @name
+		end
+		
+		def walk(level = 0)
+			yield(self, level)
 		end
 	end
 end

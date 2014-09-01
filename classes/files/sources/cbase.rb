@@ -1,31 +1,30 @@
-require_relative 'base'
+require_relative '../source'
 
 module Rue
 	class CBase < SourceFile
 		
-		def initialize(project, name, options)
-			super(project, name, options)
+		def initialize(project, name)
+			super(project, name)
 		end
 		
-		def check!
-			return unless self.exists?
-			@ctime = Time.now
-			File.open(@name, 'r') do |file|
+		def crawl!
+			qtfile  = false
+			dirname = ::File.dirname(@name)
+			::File.open(@name, 'r') do |file|
 				file.each_line do |line|
+					qtfile |= line.include?('Q_OBJECT')
 					if(match = line.match(/\A\s*#\s*include\s+\"([^\"]+)\"/))
-						name = File.realpath(match[1], self.dirname)
-						if name.start_with?(@project.srcdir + '/')
-							file = @project.files.source(name)
-							@deps.add(file)
-						end
-					end
-					
-					if(line.include? 'Q_OBJECT')
-						file = @project.files.source(@name + '.moc.cpp')
-						file.source = self
-						@gens.add(file)
+						name = ::File.realpath(match[1], dirname)
+						file = @project.files[name]
+						@deps.add(file, true)
 					end
 				end
+			end
+			
+			if qtfile
+				file = @project.files[@name + '.moc.cpp']
+				file.source = self
+				@gens.add(file, true)
 			end
 		end
 	end
