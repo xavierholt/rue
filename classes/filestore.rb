@@ -1,8 +1,10 @@
+require_relative 'files/all'
+
 require 'find'
 require 'json'
 
 module Rue
-	class FileStore2
+	class FileStore
 		include Enumerable
 		
 		FILETYPES = {

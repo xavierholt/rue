@@ -1,6 +1,5 @@
 require_relative 'mode'
 require_relative 'filestore'
-require_relative 'filestore2'
 require_relative 'task'
 
 require 'fileutils'
@@ -36,7 +35,7 @@ module Rue
 			self.objdir = 'builds'
 			
 			@default_mode = 'default'
-			@files   = FileStore2.new(self)
+			@files   = FileStore.new(self)
 			@modes   = {}
 			@tasks   = {}
 			@options = [{
