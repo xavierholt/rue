@@ -14,9 +14,7 @@ module Rue
 				file.each_line do |line|
 					qtfile |= line.include?('Q_OBJECT')
 					if(match = line.match(/\A\s*#\s*include\s+\"([^\"]+)\"/))
-						name = ::File.realpath(match[1], dirname)
-						file = @project.files[name]
-						@deps.add(file, true)
+						self.add_relative_dep(match[1], true)
 					end
 				end
 			end

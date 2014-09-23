@@ -6,14 +6,6 @@ module Rue
 		attr_reader :objdir
 		attr_reader :srcdir
 		
-		def initialize(project, name, options)
-			super(project, name)
-			@srcdir = ::File.realpath(options[:srcdir])
-			@objdir = options[:objdir]
-			@block  = options[:block]
-			@libs   = Array(options[:libs])
-		end
-		
 		def args
 			return {
 				:mylibs => "-L'#{@project.objdir}/latest' #{@libs.map(&:linkname).join(' ')}",
@@ -31,6 +23,13 @@ module Rue
 			end
 			
 			result
+		end
+		
+		def configure(options)
+			@srcdir = ::File.realpath(options[:srcdir])
+			@objdir = options[:objdir]
+			@block  = options[:block]
+			@libs   = Array(options[:libs])
 		end
 	end
 end

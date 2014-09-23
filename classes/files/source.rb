@@ -2,6 +2,17 @@ require_relative 'file'
 
 module Rue
 	class SourceFile < File
+		def add_relative_dep(name, auto)
+			begin
+				name = ::File.realpath(name, ::File.dirname(@name))
+			rescue
+				@project.error("Could not locate dependency \"#{name}\"", "Required by file \"#{@name}\"")
+			end
+			
+			file = @project.files[name]
+			@deps.add(file, auto)
+		end
+		
 		def check!
 			if c = @project.files.cache(@name)
 				@ctime = Time.at(c['time']) rescue nil

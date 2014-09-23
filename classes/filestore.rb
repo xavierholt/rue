@@ -40,7 +40,7 @@ module Rue
 		
 		def initialize(project)
 			@project = project
-			@targets = []
+			@targets = Set.new
 			
 			@all  = []
 			@map  = {}
@@ -109,12 +109,11 @@ module Rue
 			end
 		end
 		
-		def target(name, options)
+		def target(name, options = nil)
 			path = "#{@project.objdir}/latest/#{name}"
 			type = fileclass(name, OutFile)
-			file = type.new(@project, path, options)
-			@map[path] = file
-			@all << file
+			file = self[path, type]
+			file.configure(options) if options
 			@targets << file
 			return file
 		end
