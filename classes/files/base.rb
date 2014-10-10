@@ -56,6 +56,10 @@ module Rue
 			return @tarjan_l
 		end
 		
+		def libs
+			return []
+		end
+		
 		def mtime
 			if @mtime
 				return @mtime

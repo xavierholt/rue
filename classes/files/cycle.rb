@@ -27,6 +27,7 @@ module Rue
 			
 			@files.each do |file|
 				@deps.merge(file.deps.map(&:cycle))
+				@deps.merge(file.libs.map(&:cycle))
 			end
 			
 			@deps.delete(self)

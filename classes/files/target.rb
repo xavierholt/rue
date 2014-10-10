@@ -5,6 +5,7 @@ module Rue
 		
 		attr_reader :objdir
 		attr_reader :srcdir
+		attr_reader :libs
 		
 		def args
 			return {
