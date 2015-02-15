@@ -79,14 +79,19 @@ module Rue
 		def print
 			puts "#{@name} (#{self.class})"
 			@deps.each do |dep|
-				desc = "\e[35m-\e[39m"
-				desc = "\e[34m~\e[39m" if dep == @dir
-				desc = "\e[36m*\e[39m" if dep == @deps.main
-				puts "   #{desc} #{dep.name}"
+				desc = case(dep)
+				when @dir
+					"\e[34mdir\e[39m"
+				when @deps.main
+					"\e[36msrc\e[39m"
+				else
+					"\e[35mdep\e[39m"
+				end
+				puts "  #{desc} #{dep.name}"
 			end if @deps
 			
 			@gens.each do |gen|
-				puts "   \e[32m+\e[39m #{gen.name}"
+				puts "  \e[32mgen\e[39m #{gen.name}"
 			end if @gens
 		end
 		
