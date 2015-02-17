@@ -82,7 +82,7 @@ this:
 
 ```ruby
 Rue.project do |p|
-    p.default_mode = 'debug'
+    p.default_build = 'debug'
     
     # Global settings:
     p[:cpp][:flags] += ' -Wall -Wextra'
@@ -102,6 +102,6 @@ end
 ```
 
 You can build either explicitly with the commands `rue debug` and `rue release`;
-the  `default_mode`  setting controls what happens when you run just `rue`  - in
+the  `default_build`  setting controls what happens when you run just `rue`.  In
 the example above, Rue will run a debug build.
 
