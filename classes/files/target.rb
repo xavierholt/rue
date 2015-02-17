@@ -1,36 +1,36 @@
-require_relative 'file'
+require_relative 'base'
 
 module Rue
-	class TargetFile < File
+	class TargetFile < FSBase
 		
 		attr_reader :objdir
 		attr_reader :srcdir
 		attr_reader :libs
 		
+		def initialize(project, name, options = {})
+			super(project, name, options)
+			@srcdir = options[:srcdir]
+			@bindir = options[:bindir]
+			@objdir = options[:objdir]
+			@block  = options[:block]
+			@libs   = options[:libs]
+		end
+		
 		def args
 			return {
-				:mylibs => "-L'#{@project.objdir}/latest' #{@libs.map(&:linkname).join(' ')}",
+				:mylibs => "-L'#{@bindir}' #{@libs.map(&:linkname).join(' ')}",
 				:source => (@deps.select {|dep| ObjectFile === dep}).join(' '),
-				:target => @name
+				:target => self.name
 			}
 		end
 		
-		def build!(force)
-			result = nil
+		def scoped
+			return yield if @block.nil?
 			@project.scoped do
 				@project.logger.debug("Preparing #{@name}")
-				@block.call if @block
-				result = super
+				@block.call
+				yield
 			end
-			
-			result
-		end
-		
-		def configure(options)
-			@srcdir = ::File.realpath(options[:srcdir])
-			@objdir = options[:objdir]
-			@block  = options[:block]
-			@libs   = Array(options[:libs])
 		end
 	end
 end

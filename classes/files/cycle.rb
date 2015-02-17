@@ -1,41 +1,60 @@
 module Rue
 	class Cycle
 		
-		def initialize(stack, last)
-			@files = Set.new
-			@deps  = Set.new
+		def initialize(project, stack, last)
+			@project = project
+			@files   = Set.new
+			@deps    = Set.new
+			@libs    = Set.new
 			
 			loop do
 				file = stack.pop
-				@files.add(file)
 				file.cycle = self
+				@files.add(file)
+				@deps.merge(file.deps.map(&:cycle).compact)
+				@libs.merge(file.libs.map(&:cycle).compact)
 				break if file == last
+			end
+			
+			@deps.delete(self)
+			
+			if @files.count > 1
+				tgt = files.any? {|f| TargetFile === file}
+				@project.logger.log(tgt ? Logger::ERROR : Logger::WARN, 'Circular dependency!')
+				@files.each {|file| @project.logger.warn(" - #{file}")}
+				@project.error("Aborting:  Targets may not contain cycles.") if tgt
 			end
 		end
 		
 		def build!
-			return @built unless @built.nil?
-			force   = @deps.reduce(false) {|f, dep|  f |= dep.build!}
-			force ||= @files.any? {|file| file.build_required?}
-			@built  = @files.reduce(force) {|f, file| f |= file.build! force}
-			return @built
-		end
-		
-		def check!
-			return if @checked
-			@checked = true
-			
-			@files.each do |file|
-				@deps.merge(file.deps.map(&:cycle))
-				@deps.merge(file.libs.map(&:cycle))
+			unless @built
+				@built = true
+				ltimes = @libs.map(&:build!)
+				
+				@files.first.scoped do
+					dtimes = @deps.map(&:build!)
+					@btime = (ltimes + dtimes).compact.max
+					ftimes = @files.map do |file|
+						file.build! if file.build? @btime
+						file.mtime
+					end
+					
+					@btime = (ftimes << @btime).compact.max
+				end
 			end
 			
-			@deps.delete(self)
+			return @btime
+		end
+		
+		def print(level = 0)
+			puts "#{'   ' * level}#{self}"
+			@files.each {|f| puts "#{'   ' * level}    - #{f}"} if @files.count > 1
+			@deps.each {|d| d.print(level + 1)}
 		end
 		
 		def to_s
 			if @files.count == 1
-				"Cycle [#{@files.first}]"
+				@files.first.to_s
 			else
 				"Cycle [#{@files.count} files]"
 			end

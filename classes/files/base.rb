@@ -8,8 +8,9 @@ module Rue
 	class FSBase
 		
 		attr_reader   :deps
-		attr_reader   :dir
+		attr_accessor :dir
 		attr_reader   :gens
+		attr_writer   :mtime
 		attr_reader   :name
 		attr_accessor :cycle
 		
@@ -17,27 +18,58 @@ module Rue
 			project.logger.debug('Adding   ' + name)
 			@project = project
 			@name    = name
+			@deps    = DepSet.new
+			@gens    = DepSet.new
 			
-			@deps = DepSet.new
-			@gens = DepSet.new
+			if !options[:root] or @project.files.include? self.dirname
+				@project.files[self.dirname, Directory] << self
+			end
 		end
 		
-		def build!(force)
+		def args
+			return {
+				:source => self.source,
+				:target => self.name
+			}
+		end
+		
+		def build!
+			if command = self.command
+				@project.logger.info("Building #{@name}")
+				@project.execute(command)
+				@mtime = Time.now
+			elsif self.mtime.nil?
+				@project.error("No rule to build missing file \"#{@name}\".")
+			end
+		end
+		
+		def build?(dtime)
+			if self.mtime.nil?
+				return true
+			elsif dtime.nil?
+				return false
+			else
+				return self.mtime < dtime
+			end
+		end
+		
+		def command
+			builder = @project.builder(self.source.class, self.class)
+			if default = @project[builder]
+				return default[:command] % default.merge(self.args)
+			end
+		end
+		
+		def crawl!
+			throw NotImplementedError.new
+		end
+		
+		def crawl?
 			return false
 		end
 		
-		def build_required?
-			return self.mtime.nil?
-		end
-		
-		def check!
-			return nil
-		end
-		
-		def dir=(file)
-			@deps.add(file)
-			@dir = file
-			@dir << self
+		def dirname
+			return File.dirname(@name)
 		end
 		
 		def exists?
@@ -45,15 +77,18 @@ module Rue
 		end
 		
 		def graph!(stack = [])
-			return @tarjan_i if @tarjan_i
+			if @tarjan_i
+				return @cycle? nil : @tarjan_i
+			end
+			
 			@tarjan_i = stack.count
 			stack.push(self)
 			
 			ra = self.deps.map {|d| d.graph! stack}
-			@tarjan_l = (ra << @tarjan_i).min
+			@tarjan_l = (ra << @tarjan_i).compact.min
 			
-			Cycle.new(stack, self) if @tarjan_i == @tarjan_l
-			return @tarjan_l
+			Cycle.new(@project, stack, self) if @tarjan_i == @tarjan_l
+			return @tarjan_i
 		end
 		
 		def libs
@@ -77,7 +112,7 @@ module Rue
 		end
 		
 		def print
-			puts "#{@name} (#{self.class})"
+			puts "\e[1m#{@name}\e[0m (#{self.class})"
 			@deps.each do |dep|
 				desc = case(dep)
 				when @dir
@@ -88,15 +123,33 @@ module Rue
 					"\e[35mdep\e[39m"
 				end
 				puts "  #{desc} #{dep.name}"
-			end if @deps
+			end
 			
 			@gens.each do |gen|
 				puts "  \e[32mgen\e[39m #{gen.name}"
-			end if @gens
+			end
+		end
+		
+		def scoped
+			yield
+		end
+		
+		def source
+			return @deps.main
+		end
+		
+		def source=(s)
+			@deps.main = s
+		rescue
+			@project.error([
+				"Attempted to re-source #{@name}!",
+				"Old Source: #{@deps.main}",
+				"New Source: #{s}"
+			].join("\n   "))
 		end
 		
 		def to_s
-			return @name
+			return self.name
 		end
 		
 		def walk(level = 0)

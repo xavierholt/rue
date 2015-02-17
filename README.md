@@ -25,7 +25,7 @@ Your ruefile could look like this:
 
 ```ruby
 Rue.project do |p|
-    p.target('p.out', :srcdir => 'src')
+    p.target('hello.out', :srcdir => 'src')
 end
 ```
 
@@ -35,12 +35,13 @@ Then, after running Rue, your directory would look like this:
       + builds/
         + all/
           + default/
-            + cache/
+            + obj/
               + hello.out/
                 - hello.cpp.o
                 - main.cpp.o
-            - p.out
-        - latest -> all/default
+            + bin
+              - hello.out
+        - latest -> all/default/bin
       + src/
         - hello.cpp
         - hello.h
@@ -58,8 +59,8 @@ That's it!
 ## What just hapened?
 
 You told Rue that your project was made up of one Target (executable / library)
-that was called "p.out" and that had the root of its source tree at "src".  Rue
-took care of the rest - it found all the source files in that directory,
+that was called "hello.out" and that had the root of its source tree at "src".
+Rue took care of the rest - it found all the source files in that directory,
 figured out how they depended on one another, and compiled them down to the
 desired executable, keeping cached versions of the intermediate object files so
 it won't have to do nearly as much work next time.
@@ -72,8 +73,8 @@ files next time you run it.
 
 ## Details
 
-Rue has two main forms of configuration: Targets and Modes.  A Target, as we've
-already seen, is something the compiler is expected to produce.  A Mode is a
+Rue has two main forms of configuration: Targets and Builds.  A Target, as we've
+already seen, is something the compiler is expected to produce.  A Build is a
 scope for configuration options you only want in certain situations.  For
 example, if you only want debugging info in your debug builds, and only want to
 spend cycles optimizing for your release builds, you could write a ruefile like
@@ -86,17 +87,21 @@ Rue.project do |p|
     # Global settings:
     p[:cpp][:flags] += ' -Wall -Wextra'
     
-    p.mode 'debug' do
+    p.build 'debug' do
         # Only for debug builds
         p[:cpp][:flags] += ' -g'
     end
     
-    p.mode 'release' do
+    p.build 'release' do
         # Only for release builds
         p[:cpp][:flags] += ' -O3'
     end
     
-    p.target 'p.out', :srcdir => 'src'
+    p.target 'hello.out', :srcdir => 'src'
 end
 ```
+
+You can build either explicitly with the commands `rue debug` and `rue release`;
+the  `default_mode`  setting controls what happens when you run just `rue`  - in
+the example above, Rue will run a debug build.
 

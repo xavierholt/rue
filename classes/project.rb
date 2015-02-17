@@ -1,8 +1,8 @@
-require_relative 'mode'
 require_relative 'filestore'
-require_relative 'task'
+require_relative 'project/builds'
+require_relative 'project/subdirs'
+require_relative 'project/tasks'
 
-require 'fileutils'
 require 'logger'
 
 module Rue
@@ -10,8 +10,6 @@ module Rue
 		attr_accessor :default_mode
 		attr_reader   :files
 		attr_accessor :logger
-		attr_reader   :objdir
-		attr_reader   :srcdir
 		attr_reader   :tasks
 		
 		COLORIZE = {
@@ -27,18 +25,13 @@ module Rue
 			@logger.level = Logger::INFO
 			@logger.formatter = proc do |severity, datetime, progname, msg|
 				prompt = sprintf('%-5s (Rue): ', severity)
-				prompt = "\033[1m\033[#{COLORIZE[severity]}m#{prompt}\033[0m"
+				prompt = "\e[1m\e[#{COLORIZE[severity]}m#{prompt}\e[0m"
 				"#{prompt}#{msg}\n"
 			end
 			
-			self.srcdir = 'src'
-			self.objdir = 'builds'
-			
-			@default_mode = 'default'
 			@files   = FileStore.new(self)
-			@modes   = {}
-			@tasks   = {}
 			@options = [{
+				:target_list => {},
 				:a => {
 					:command => '%{program} %{flags} %{target} %{source}',
 					:program => 'ar',
@@ -58,6 +51,11 @@ module Rue
 					:command => '%{program} %{flags} %{source} -o %{target}',
 					:program => 'g++',
 					:flags => '-c'
+				},
+				:dir => {
+					:command => '%{program} %{flags} %{target}',
+					:program => 'mkdir',
+					:flags => '-p'
 				},
 				:moc => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
@@ -82,77 +80,8 @@ module Rue
 				}
 			}]
 			
-			self.mode('default')
-			
-			self.task('build', ['graph']) do
-				built = @files.targets.inject(false) do |f, tgt|
-					f |= tgt.cycle.build!
-				end
-				
-				unless built
-					self.logger.info('All targets up to date.')
-				end
-			end
-			
-			self.task('clean') do
-				@logger.info("Removing #{self.objdir}")
-				FileUtils.rm_rf(self.objdir)
-			end
-			
-			self.task('crawl', ['mode']) do
-				@files.targets.each do |tgt|
-					@files.walk(tgt.srcdir)
-				end
-				
-				@files.each do |file|
-					file.check!
-				end
-				
-				@files.targets.each do |tgt|
-					@files[tgt.srcdir].walk do |file|
-						obj = file.object(tgt)
-						tgt.deps.add(obj) if obj
-					end
-				end
-				
-				@files.save_cache
-			end
-			
-			self.task('graph', ['crawl']) do
-				cycles = @files.map do |file|
-					file.graph!
-					file.cycle
-				end
-				
-				cycles.each do |cycle|
-					cycle.check!
-				end
-			end
-			
-			self.task('mode') do
-				modename = @current_mode || @default_mode
-				if mode = @modes[modename]
-					mode.prepare!
-				else
-					self.error("No mode \"#{modename}\" defined.")
-				end
-			end
-			
-			self.task('print', ['crawl']) do
-				@files.each do |file|
-					file.print
-				end
-			end
-			
-			self.task('tree', ['crawl']) do
-				@files.each do |file|
-					file.walk do |f, level|
-						n = f.name
-						n = ::File.basename(f.to_s) unless file ==f
-						puts '   ' * level + n
-					end if file.dir.nil?
-				end
-			end
+			self.init_default_tasks
+			self.init_default_build
 		end
 		
 		def builder(src, dst)
@@ -173,53 +102,18 @@ module Rue
 			exit(1)
 		end
 		
-		def mode(name, &block)
-			@modes[name] = Mode.new(self, name, block)
-			self.task(name) do
-				self.mode = name
-				self.run!('build')
-			end
-		end
-		
-		def mode=(modename)
-			@current_mode = modename
-		end
-		
-		def objdir=(dir)
-			FileUtils.mkdir_p(dir)
-			@objdir = ::File.realpath(dir)
-		end
-		
-		def run!(*tasknames)
-			tasknames.each do |taskname|
-				if task = @tasks[taskname]
-					self.scoped {task.run!}
-				else
-					self.error("No task \"#{taskname}\" defined.")
-				end
-			end
-		end
-		
 		def scoped
-			@options.push(@options.last.dup)
-			yield
+			duped = {}
+			@options.last.each_pair {|k, v| duped[k] = v.dup}
+			@options.push(duped)
+			result = yield
 			@options.pop
-		end
-		
-		def srcdir=(dir)
-			@srcdir = ::File.realpath(dir)
+			return result
 		end
 		
 		def target(name, options = {}, &block)
-			options[:srcdir] ||= "#{@srcdir}/#{name.sub(/\.[^.]+\Z/, '')}"
-			options[:objdir]   = "#{@objdir}/latest/cache/#{name}"
-			options[:block]    = block
-			options[:libs]     = Array(options[:libs]).map {|n| @files.target(n)}
-			@files.target(name, options)
-		end
-		
-		def task(name, subs = [], &block)
-			@tasks[name] = Task.new(self, name, subs, block)
+			options[:block] = block
+			self[:target_list][name] = options
 		end
 		
 		def [] (key)

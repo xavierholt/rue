@@ -2,21 +2,18 @@ require_relative 'base'
 
 module Rue
 	class Directory < FSBase
-		def initialize(project, name)
-			super(project, name)
+	
+		def initialize(project, name, options = {})
+			super(project, name, options)
 			@children = Set.new
-			
-			dir = ::File.dirname(@name)
-			if @project.files.include?(dir)
-				self.dir = @project.files[dir]
-			end
 		end
 		
-		def build!(force)
-			if force or self.build_required?
-				@project.logger.info("Building #{@name}")
-				FileUtils.mkdir_p(@name)
-			end
+		def build?(dtime)
+			return !@project.files.stat(@name)
+		end
+		
+		def mtime
+			return nil
 		end
 		
 		def walk(level = 0)
@@ -29,7 +26,10 @@ module Rue
 		end
 		
 		def << (child)
+			return unless child
 			@children.add(child)
+			child.deps.add(self)
+			child.dir = self
 		end
 	end
 end

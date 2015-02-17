@@ -1,10 +1,16 @@
-require_relative 'file'
+require_relative 'base'
 
 module Rue
-	class SourceFile < File
+	class SourceFile < FSBase
+		
+		def initialize(project, name, options = {})
+			super(project, name, options)
+			self.crawl! if self.crawl?
+		end
+		
 		def add_relative_dep(name, auto)
 			begin
-				name = ::File.realpath(name, ::File.dirname(@name))
+				name = File.realpath(name, self.dirname)
 			rescue
 				@project.error("Could not locate dependency \"#{name}\"", "Required by file \"#{@name}\"")
 			end
@@ -13,38 +19,30 @@ module Rue
 			@deps.add(file, auto)
 		end
 		
-		def check!
-			if c = @project.files.cache(@name)
-				@ctime = Time.at(c['time']) rescue nil
-			end
-			
-			if self.crawl_required?
-				@project.logger.debug("Crawling #{self}")
-				@ctime = Time.now
-				self.crawl!
-			elsif @ctime
-				@project.logger.debug("Cached   #{self}")
-				(c['deps']|| []).each do |d|
-					dep = @project.files[d]
-					@deps.add(dep, true)
-				end
-				
-				(c['gens'] || []).each do |g|
-					gen = @project.files[g]
-					gen.source = self
-					@gens.add(gen, true)
-				end
-			end
+		def crawl!
+			@project.logger.debug("Crawling #{self}")
+			@ctime = Time.now
 		end
 		
-		def crawl_required?
-			if self.mtime.nil?
-				return false
-			elsif @ctime.nil?
-				return true
-			else
-				return @ctime < self.mtime
+		def crawl?
+			return false if self.mtime.nil?
+			
+			cache = @project.files.cache(@name)
+			@ctime = Time.at(cache['time']) rescue nil
+			return true if @ctime.nil? or @ctime < self.mtime
+			
+			(cache['deps'] || []).each do |d|
+				dep = @project.files[d]
+				@deps.add(dep, true)
 			end
+			
+			(cache['gens'] || []).each do |g|
+				gen = @project.files[g]
+				gen.source = self
+				@gens.add(gen, true)
+			end
+			
+			return false
 		end
 		
 		def object(target)

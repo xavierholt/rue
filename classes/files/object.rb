@@ -1,7 +1,7 @@
-require_relative 'file'
+require_relative 'base'
 
 module Rue
-	class ObjectFile < File
+	class ObjectFile < FSBase
 		###
 	end
 end
