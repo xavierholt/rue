@@ -51,15 +51,19 @@ module Rue
 				#TODO: Repeat this task for every build!
 				@build ||= @default_build
 				def find_srcdir(name, *dirs)
+					guesses = []
 					dirs.compact.each do |dir|
 						segs = name.split('.')
-						while segs.length > 0
+						until segs.empty?
 							guess = "#{dir}/#{segs.join('.')}"
 							return guess if Dir.exist? guess
+							guesses << guess
 							segs.pop
 						end
 					end
-					self.error("Could not find source directory for target \"#{name}\"!")
+					self.logger.error("Could not find source directory for target \"#{name}\"!  Tried:")
+					guesses.each {|guess| self.logger.error(" - #{guess}")}
+					exit
 				end
 				
 				targets = {}
