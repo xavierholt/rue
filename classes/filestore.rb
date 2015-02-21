@@ -111,9 +111,7 @@ module Rue
 			dir = self[root, Directory]
 			Dir.glob(root + '/*') do |path|
 				stat = self.stat(path)
-				if entry = @files[path]
-					dir << entry
-				elsif stat.directory?
+				if stat.directory?
 					dir << self.walk(path)
 				elsif stat.file?
 					dir << self[path]
