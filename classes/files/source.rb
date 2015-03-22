@@ -12,6 +12,10 @@ module Rue
 			begin
 				name = File.realpath(name, self.dirname)
 			rescue
+				#TODO: This, combined with crawling files as they're encountered
+				#      could be a problem.  If we allow generation of source
+				#      files with, say, ERB, and parse something that requires
+				#      a yet non-existant file, we crash and burn.
 				@project.error("Could not locate dependency \"#{name}\"", "Required by file \"#{@name}\"")
 			end
 			
