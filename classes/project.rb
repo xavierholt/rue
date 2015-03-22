@@ -52,11 +52,6 @@ module Rue
 					:program => 'g++',
 					:flags => '-c'
 				},
-				:dir => {
-					:command => '%{program} %{flags} %{target}',
-					:program => 'mkdir',
-					:flags => '-p'
-				},
 				:moc => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
 					:program => 'moc',

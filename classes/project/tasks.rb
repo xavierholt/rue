@@ -44,7 +44,6 @@ module Rue
 			self.task('configure') do
 				self.dstdir = 'builds' if @dstdir.nil?
 				self.srcdir = 'src' if @srcdir.nil? and Dir.exist? 'src'
-				@files[self.dstdir, Directory, :root => true]
 			end
 			
 			self.task('instantiate-targets', ['configure']) do
@@ -76,7 +75,6 @@ module Rue
 					
 					path = "#{self.dstdir}/all/#{@build}/bin/#{name}"
 					targets[name] = @files[path, @files.fileclass(name, OutFile), options]
-					@files[options[:srcdir], Directory, :root => true]
 				end
 				
 				self[:targets] = targets.values
@@ -97,19 +95,16 @@ module Rue
 			end
 			
 			self.task('instantiate-sources', ['instantiate-targets']) do
-				self[:targets].each {|tgt| @files.walk(tgt.srcdir)}
-				#TODO: Do this once, after everything is finished?
-				#TODO: Do this once per build?
-				@files.save_cache
-			end
-			
-			self.task('instantiate-objects', ['instantiate-sources']) do
 				self[:targets].each do |tgt|
-					@files[tgt.srcdir].walk do |file|
+					@files.walk(tgt.srcdir) do |file|
 						obj = file.object(tgt)
 						tgt.deps.add(obj) if obj
 					end
 				end
+				
+				#TODO: Do this once, after everything is finished?
+				#TODO: Do this once per build?
+				@files.save_cache
 			end
 			
 			self.task('cycles', ['graph']) do
@@ -118,7 +113,7 @@ module Rue
 				end
 			end
 			
-			self.task('graph', ['instantiate-objects']) do
+			self.task('graph', ['instantiate-sources']) do
 				@files.each {|file| file.graph!}
 			end
 			
@@ -129,16 +124,6 @@ module Rue
 			self.task('symlink', ['build']) do
 				FileUtils.rm("#{self.dstdir}/latest", :force => true)
 				FileUtils.ln_s("all/#{@build}/bin", "#{self.dstdir}/latest", :force => true)
-			end
-			
-			self.task('tree', ['instantiate-objects']) do
-				@files.each do |file|
-					file.walk do |f, level|
-						n = f.name
-						n = File.basename(f.to_s) unless file ==f
-						puts '   ' * level + n
-					end if file.dir.nil?
-				end
 			end
 		end
 	end

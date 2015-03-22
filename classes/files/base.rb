@@ -8,9 +8,7 @@ module Rue
 	class FSBase
 		
 		attr_reader   :deps
-		attr_accessor :dir
 		attr_reader   :gens
-		attr_writer   :mtime
 		attr_reader   :name
 		attr_accessor :cycle
 		
@@ -20,10 +18,6 @@ module Rue
 			@name    = name
 			@deps    = DepSet.new
 			@gens    = DepSet.new
-			
-			if !options[:root] or @project.files.include? self.dirname
-				@project.files[self.dirname, Directory] << self
-			end
 		end
 		
 		def args
@@ -36,6 +30,7 @@ module Rue
 		def build!
 			if command = self.command
 				@project.logger.info("Building #{@name}")
+				FileUtils.mkdir_p(self.dirname) if self.mtime.nil?
 				@project.execute(command)
 				@mtime = Time.now
 			elsif self.mtime.nil?
@@ -115,8 +110,6 @@ module Rue
 			puts "\e[1m#{@name}\e[0m (#{self.class})"
 			@deps.each do |dep|
 				desc = case(dep)
-				when @dir
-					"\e[34mdir\e[39m"
 				when @deps.main
 					"\e[36msrc\e[39m"
 				else

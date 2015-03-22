@@ -25,7 +25,6 @@ module Rue
 			[CFile,     OFile]     => :c,
 			[CppFile,   OFile]     => :cpp,
 			[CppFile,   MocFile]   => :moc,
-			[NilClass,  Directory] => :dir,
 			[HFile,     MocFile]   => :moc,
 			[MocFile,   OFile]     => :cpp,
 			[SFile,     OFile]     => :as,
@@ -107,17 +106,16 @@ module Rue
 			end
 		end
 		
-		def walk(root)
-			dir = self[root, Directory]
+		def walk(root, &block)
 			Dir.glob(root + '/*') do |path|
 				stat = self.stat(path)
 				if stat.directory?
-					dir << self.walk(path)
+					self.walk(path, &block)
 				elsif stat.file?
-					dir << self[path]
+					file = self[path]
+					yield file if file
 				end
 			end
-			dir
 		end
 		
 		def [] (path, type = nil, options = {})
