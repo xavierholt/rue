@@ -41,6 +41,7 @@ module Rue
 			@project = project
 			@files   = {}
 			@stats   = {}
+			@ignore  = File.read('.rueignore').split(/\s*\n\s*/).compact rescue []
 		end
 		
 		def add(path, type = nil)
@@ -70,6 +71,12 @@ module Rue
 			end
 			
 			return default
+		end
+		
+		def ignore?(path)
+			@ignore.any? do |pattern|
+				File.fnmatch?("**/#{pattern}", path)
+			end
 		end
 		
 		def include?(path)
@@ -108,12 +115,16 @@ module Rue
 		
 		def walk(root, &block)
 			Dir.glob(root + '/*') do |path|
-				stat = self.stat(path)
-				if stat.directory?
-					self.walk(path, &block)
-				elsif stat.file?
-					file = self[path]
-					yield file if file
+				if self.ignore? path
+					@project.logger.debug("Ignoring #{path}")
+				else
+					stat = self.stat(path)
+					if stat.directory?
+						self.walk(path, &block)
+					elsif stat.file?
+						file = self[path]
+						yield file if file
+					end
 				end
 			end
 		end
