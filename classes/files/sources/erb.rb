@@ -1,15 +1,28 @@
 require_relative '../source'
 
 module Rue
-	class ErbFile < FileBase
+	class ErbFile < SourceFile
 		
 		def initialize(project, name, options = {})
 			super(project, name, options)
-			@project.file(name.sub(/\.erb\Z/i, ''), :source => self)
+			self.gen @project.files[@name.sub(/\.erb\Z/i, '')]
 		end
-		
-		def compiler
-			:erb
+
+		def crawl!
+			super
+			File.open(@name, 'r') do |file|
+				file.each_line do |line|
+					if match = line.match(/require_relative\s+['"]([^'"]+)['"]/)
+						filename  = match[1]
+						filename += '.rb' unless filename.end_with? '.rb'
+						self.add_relative_dep(filename, true)
+					end
+				end
+			end
+		end
+
+		def object(target)
+			return nil
 		end
 	end
 end

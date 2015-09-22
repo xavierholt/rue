@@ -1,5 +1,7 @@
 require_relative 'c'
 require_relative 'cpp'
+require_relative 'erb'
 require_relative 'h'
 require_relative 'moc'
+require_relative 'rb'
 require_relative 's'

@@ -7,17 +7,23 @@ require_relative '../depset'
 module Rue
 	class FSBase
 		
+		attr_accessor :cycle
 		attr_reader   :deps
 		attr_reader   :gens
 		attr_reader   :name
-		attr_accessor :cycle
+		attr_reader   :refs
 		
 		def initialize(project, name, options = {})
+			name = File.absolute_path(name)
 			project.logger.debug('Adding   ' + name)
+
 			@project = project
 			@name    = name
 			@deps    = DepSet.new
 			@gens    = DepSet.new
+			@refs    = Set.new
+
+			project.files.add(self)
 		end
 		
 		def args
@@ -34,7 +40,10 @@ module Rue
 				@project.execute(command)
 				@mtime = Time.now
 			elsif self.mtime.nil?
-				@project.error("No rule to build missing file \"#{@name}\".")
+				@project.error(
+					"No rule to build missing file \"#{@name}\".",
+					"Required by:\n" + @refs.join("\n - ")
+				)
 			end
 		end
 		
@@ -62,6 +71,11 @@ module Rue
 		def crawl?
 			return false
 		end
+
+		def dep(file, auto = false)
+			@deps.add(file, auto)
+			file.refs.add(self)
+		end
 		
 		def dirname
 			return File.dirname(@name)
@@ -69,6 +83,11 @@ module Rue
 		
 		def exists?
 			return !self.mtime.nil?
+		end
+
+		def gen(file, auto = false)
+			@gens.add(file, auto)
+			file.source = self
 		end
 		
 		def graph!(stack = [])
@@ -122,7 +141,7 @@ module Rue
 				puts "  \e[32mgen\e[39m #{gen.name}"
 			end
 		end
-		
+
 		def scoped
 			yield
 		end

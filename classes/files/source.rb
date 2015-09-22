@@ -5,45 +5,39 @@ module Rue
 		
 		def initialize(project, name, options = {})
 			super(project, name, options)
-			self.crawl! if self.crawl?
+
+			@project[:targets].each do |tgt|
+				if @name.start_with? tgt.srcdir
+					obj = self.object(tgt)
+					tgt.dep(obj) if obj
+				end
+			end
 		end
 		
 		def add_relative_dep(name, auto)
-			begin
-				name = File.realpath(name, self.dirname)
-			rescue
-				#TODO: This, combined with crawling files as they're encountered
-				#      could be a problem.  If we allow generation of source
-				#      files with, say, ERB, and parse something that requires
-				#      a yet non-existant file, we crash and burn.
-				@project.error("Could not locate dependency \"#{name}\"", "Required by file \"#{@name}\"")
-			end
-			
-			file = @project.files[name]
-			@deps.add(file, auto)
+			name = File.absolute_path(name, self.dirname)
+			@project.files[name].dep(self, auto)
 		end
 		
 		def crawl!
-			@project.logger.debug("Crawling #{self}")
+			@project.logger.debug "Crawling #{self}"
 			@ctime = Time.now
 		end
 		
 		def crawl?
 			return false if self.mtime.nil?
+			# return false if self.source and self.source.mtime > self.mtime
 			
 			cache = @project.files.cache(@name)
 			@ctime = Time.at(cache['time']) rescue nil
 			return true if @ctime.nil? or @ctime < self.mtime
 			
 			(cache['deps'] || []).each do |d|
-				dep = @project.files[d]
-				@deps.add(dep, true)
+				self.dep(@project.files[d], true)
 			end
 			
 			(cache['gens'] || []).each do |g|
-				gen = @project.files[g]
-				gen.source = self
-				@gens.add(gen, true)
+				self.gen(@project.files[g], true)
 			end
 			
 			return false

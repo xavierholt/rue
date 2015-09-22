@@ -13,10 +13,12 @@ module Rue
 			'.cc'      => CppFile,
 			'.cpp'     => CppFile,
 			'.cxx'     => CppFile,
+			'.erb'     => ErbFile,
 			'.h'       => HFile,
 			'.hpp'     => HFile,
 			'.o'       => OFile,
 			'.out'     => OutFile,
+			'.rb'      => RbFile,
 			'.s'       => SFile,
 			'.so'      => SOFile
 		}
@@ -25,6 +27,7 @@ module Rue
 			[CFile,     OFile]     => :c,
 			[CppFile,   OFile]     => :cpp,
 			[CppFile,   MocFile]   => :moc,
+			[ErbFile,   NilClass]  => :erb,
 			[HFile,     MocFile]   => :moc,
 			[MocFile,   OFile]     => :cpp,
 			[SFile,     OFile]     => :as,
@@ -44,16 +47,8 @@ module Rue
 			@ignore  = File.read('.rueignore').split(/\s*\n\s*/).compact rescue []
 		end
 		
-		def add(path, type = nil)
-			if file = @files[path]
-				return file
-			elsif type ||= fileclass(path)
-				file = type.new(@project, path)
-				return @files[path] = file
-			else
-				@project.logger.warn("Skipping file of unknown type: #{path}")
-				return nil
-			end
+		def add(file)
+			@files[file.name] = file
 		end
 		
 		def cache(path)
@@ -79,18 +74,22 @@ module Rue
 			end
 		end
 		
-		def include?(path)
-			return @files.include?(path)
-		end
-		
 		def load_cache
 			@project.logger.debug("Loading cache...")
 			file = File.open('.ruecache', 'r')
 			@cache = JSON.load(file.read) rescue @project.logger.warn("Cache corrupted!") && {}
 			file.close
 		rescue
-			@project.logger.info("Could not load cache: all sources will be crawled.")
+			@project.logger.warn("Could not load cache: all sources will be crawled.")
 			@cache = {}
+		end
+
+		def objects
+			self.select {|f| f.is_a? ObjectFile}
+		end
+
+		def sources
+			self.select {|f| f.is_a? SourceFile}
 		end
 		
 		def stat(path)
@@ -107,10 +106,14 @@ module Rue
 		
 		def save_cache
 			@project.logger.debug("Saving cache...")
-			sources = @files.select {|n, f| SourceFile === f}
+			sources = @files.select {|n, f| f.is_a? SourceFile}
 			File.open('.ruecache', 'w') do |file|
 				file << JSON.fast_generate(sources)
 			end
+		end
+
+		def targets
+			self.select {|f| f.is_a? TargetFile}
 		end
 		
 		def walk(root, &block)
@@ -123,7 +126,7 @@ module Rue
 						self.walk(path, &block)
 					elsif stat.file?
 						file = self[path]
-						yield file if file
+						yield file if file and block_given?
 					end
 				end
 			end
@@ -133,8 +136,7 @@ module Rue
 			if file = @files[path]
 				return file
 			elsif type ||= fileclass(path)
-				file = type.new(@project, path, options)
-				return @files[path] = file
+				return type.new(@project, path, options)
 			else
 				@project.logger.warn("Skipping file of unknown type: #{path}")
 				return nil

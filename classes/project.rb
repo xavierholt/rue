@@ -52,6 +52,11 @@ module Rue
 					:program => 'g++',
 					:flags => '-c'
 				},
+				:erb => {
+					:command => '%{program} %{flags} %{source} -o %{target}',
+					:program => 'rhubarb',
+					:flags => ''
+				},
 				:moc => {
 					:command => '%{program} %{flags} %{source} -o %{target}',
 					:program => 'moc',
@@ -80,7 +85,7 @@ module Rue
 		end
 		
 		def builder(src, dst)
-			return FileStore::BUILDERS[[src, dst]]
+			FileStore::BUILDERS[[src, dst]] || FileStore::BUILDERS[[src, NilClass]]
 		end
 		
 		def execute(command)

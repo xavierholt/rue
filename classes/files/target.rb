@@ -9,9 +9,9 @@ module Rue
 		
 		def initialize(project, name, options = {})
 			super(project, name, options)
-			@srcdir = options[:srcdir]
-			@bindir = options[:bindir]
-			@objdir = options[:objdir]
+			@srcdir = File.absolute_path(options[:srcdir])
+			@bindir = File.absolute_path(options[:bindir])
+			@objdir = File.absolute_path(options[:objdir])
 			@block  = options[:block]
 			@libs   = options[:libs]
 		end

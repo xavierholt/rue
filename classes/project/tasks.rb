@@ -96,10 +96,11 @@ module Rue
 			
 			self.task('instantiate-sources', ['instantiate-targets']) do
 				self[:targets].each do |tgt|
-					@files.walk(tgt.srcdir) do |file|
-						obj = file.object(tgt)
-						tgt.deps.add(obj) if obj
-					end
+					@files.walk(tgt.srcdir)
+				end
+
+				@files.sources.each do |file|
+					file.crawl! if file.crawl?
 				end
 				
 				#TODO: Do this once, after everything is finished?

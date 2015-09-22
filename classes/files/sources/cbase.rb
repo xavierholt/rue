@@ -16,9 +16,7 @@ module Rue
 			end
 			
 			if qtfile
-				file = @project.files[@name + '.moc.cpp']
-				file.source = self
-				@gens.add(file, true)
+				self.gen(@project.files["{@name}.moc.cpp"], true)
 			end
 		end
 	end
