@@ -15,7 +15,7 @@ module Rue
 		
 		def initialize(project, name, options = {})
 			name = File.absolute_path(name)
-			project.logger.debug('Adding   ' + name)
+			project.logger.debug("Adding   #{name}")
 
 			@project = project
 			@name    = name
@@ -48,7 +48,7 @@ module Rue
 		end
 		
 		def build?(dtime)
-			if self.mtime.nil?
+			if !self.exists?
 				return true
 			elsif dtime.nil?
 				return false
@@ -121,10 +121,6 @@ module Rue
 			end
 		end
 		
-		def object(target)
-			return nil
-		end
-		
 		def print
 			puts "\e[1m#{@name}\e[0m (#{self.class})"
 			@deps.each do |dep|
@@ -139,6 +135,10 @@ module Rue
 			
 			@gens.each do |gen|
 				puts "  \e[32mgen\e[39m #{gen.name}"
+			end
+
+			@refs.each do |ref|
+				puts "  \e[30mref\e[39m #{ref.name}"
 			end
 		end
 

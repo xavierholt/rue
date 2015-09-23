@@ -5,13 +5,6 @@ module Rue
 		
 		def initialize(project, name, options = {})
 			super(project, name, options)
-
-			@project[:targets].each do |tgt|
-				if @name.start_with? tgt.srcdir
-					obj = self.object(tgt)
-					tgt.dep(obj) if obj
-				end
-			end
 		end
 		
 		def add_relative_dep(name, auto)
@@ -25,9 +18,8 @@ module Rue
 		end
 		
 		def crawl?
-			return false if self.mtime.nil?
-			# return false if self.source and self.source.mtime > self.mtime
-			
+			return false unless self.exists?
+
 			cache = @project.files.cache(@name)
 			@ctime = Time.at(cache['time']) rescue nil
 			return true if @ctime.nil? or @ctime < self.mtime
