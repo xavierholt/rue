@@ -16,9 +16,9 @@ module Rue
 		
 		def add_relative_dep(name, auto)
 			name = File.absolute_path(name, self.dirname)
-			@project.files[name].dep(self, auto)
+			self.dep(@project.files[name], auto)
 		end
-		
+
 		def crawl!
 			@project.logger.debug "Crawling #{self}"
 			@ctime = Time.now
@@ -42,12 +42,19 @@ module Rue
 			
 			return false
 		end
+
+		def object?
+			return true
+		end
 		
-		def object(target)
-			name = @name.sub(target.srcdir, target.objdir) << '.o'
-			file = @project.files[name, OFile]
-			file.source = self
-			return file
+		def object!(targets)
+			targets.each do |target|
+				next unless @name.start_with? target.srcdir
+				name = @name.sub(target.srcdir, target.objdir) << '.o'
+				file = @project.files[name, OFile]
+				target.dep file
+				self.gen file
+			end
 		end
 		
 		def to_json(*args)

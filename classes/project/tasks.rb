@@ -107,6 +107,13 @@ module Rue
 				#TODO: Do this once per build?
 				@files.save_cache
 			end
+
+			self.task('instantiate-objects', ['instantiate-sources']) do
+				targets = self[:targets]
+				@files.sources.each do |file|
+					file.object!(targets) if file.object?
+				end
+			end
 			
 			self.task('cycles', ['graph']) do
 				self[:targets].each do |tgt|
@@ -114,7 +121,7 @@ module Rue
 				end
 			end
 			
-			self.task('graph', ['instantiate-sources']) do
+			self.task('graph', ['instantiate-objects']) do
 				@files.each {|file| file.graph!}
 			end
 			
