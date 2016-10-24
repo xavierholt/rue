@@ -42,7 +42,7 @@ module Rue
 			elsif self.mtime.nil?
 				@project.error(
 					"No rule to build missing file \"#{@name}\".",
-					"Required by:\n" + @refs.to_a.join("\n - ")
+					"Required by:\n - " + @refs.to_a.join("\n - ")
 				)
 			end
 		end
