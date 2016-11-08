@@ -2,7 +2,6 @@ require_relative '../source'
 
 module Rue
 	class CBase < SourceFile
-		
 		def crawl!
 			super
 			qtfile = false
@@ -14,9 +13,9 @@ module Rue
 					end
 				end
 			end
-			
+
 			if qtfile
-				self.gen(@project.files["{@name}.moc.cpp"], true)
+				self.gen(@project.files["#{@name}.moc.cpp"], true)
 			end
 		end
 	end
