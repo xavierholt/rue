@@ -19,7 +19,7 @@ module Rue
 			@deps.delete(self)
 			
 			if @files.count > 1
-				tgt = files.any? {|f| TargetFile === file}
+				tgt = @files.any? {|file| TargetFile === file}
 				@project.logger.log(tgt ? Logger::ERROR : Logger::WARN, 'Circular dependency!')
 				@files.each {|file| @project.logger.warn(" - #{file}")}
 				@project.error("Aborting:  Targets may not contain cycles.") if tgt
