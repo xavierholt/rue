@@ -1,7 +1,7 @@
 require_relative 'cbase'
 
 module Rue
-	class CFile < CBase
-		###
-	end
+  class CFile < CBase
+    ###
+  end
 end
